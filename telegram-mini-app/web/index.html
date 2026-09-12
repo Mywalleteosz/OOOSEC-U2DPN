@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>My Mini App</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<style>
+body {
+    font-family: Arial;
+    text-align:center;
+    padding:40px;
+}
+
+button {
+    padding:15px 30px;
+    font-size:18px;
+}
+</style>
+
+</head>
+
+<body>
+
+<h1>🚀 My Telegram Mini App</h1>
+
+<p id="user"></p>
+
+<button onclick="sendData()">
+Нажми меня
+</button>
+
+
+<script>
+
+let tg = window.Telegram.WebApp;
+
+tg.expand();
+
+
+let user = tg.initDataUnsafe.user;
+
+if(user){
+    document.getElementById("user").innerHTML =
+    "Привет, " + user.first_name;
+}
+
+
+function sendData(){
+
+    tg.sendData(
+        JSON.stringify({
+            action:"click",
+            value:"hello"
+        })
+    );
+
+}
+
+</script>
+
+</body>
+</html>

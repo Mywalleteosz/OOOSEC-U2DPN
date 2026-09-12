@@ -1,0 +1,15 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY telegram-openai-bot/requirements.txt .
+
+RUN pip install --no-cache-dir -r requirements.txt
+
+ENV PYTHONUNBUFFERED=1
+
+COPY telegram-openai-bot/bot.py telegram-openai-bot/config.py ./
+COPY telegram-openai-bot/handlers ./handlers
+COPY telegram-openai-bot/services ./services
+
+CMD ["python", "bot.py"]

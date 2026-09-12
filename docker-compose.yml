@@ -1,0 +1,53 @@
+services:
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    env_file:
+      - .env
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      - mongo
+    volumes:
+      - /home/telo/.cursor:/host-cursor:rw
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:latest
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: ooosec-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=change_me
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - GENERIC_TIMEZONE=Europe/Moscow
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+
+volumes:
+  mongo_data:

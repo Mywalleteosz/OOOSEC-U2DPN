@@ -1,0 +1,19 @@
+skip_local_validator = true
+
+[toolchain]
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.devnet]
+hello_solana = "3ryFnyneuom3VkZ2dRn6CZnYpV2etATqqrzCVta6aBDs"
+
+[provider]
+cluster = "devnet"
+wallet = "/home/telo/.config/solana/id.json"
+
+[scripts]
+test = "cargo test"
+
+[hooks]

@@ -1,23 +1,34 @@
-# Secrets
+# Environment secrets
 .env
+*.env
+config.env
 .env.*
-*.key
-*.pem
 
 # Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
 venv/
 .venv/
-__pycache__/
-*.pyc
+myenv/
 
 # Node
 node_modules/
-.next/
-dist/
-build/
+npm-debug.log
+package-lock.json
 
 # Logs
+logs/
 *.log
+
+# Database / automation data
+n8n_data/
+
+# Backups
+*.tar.gz
+*.tar.gz.enc
 
 # IDE
 .vscode/
@@ -26,5 +37,11 @@ build/
 # OS
 .DS_Store
 
-# Backup archives
-*.tar.gz
+# Temporary
+*.save
+
+# Vercel
+.vercel/
+
+# Local backups
+.backup/
