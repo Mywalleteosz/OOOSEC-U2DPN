@@ -1,0 +1,90 @@
+name: OOOSEC CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+
+  python-check:
+    name: Python Check
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          if [ -f apps/requirements.txt ]; then
+            pip install -r apps/requirements.txt
+          fi
+
+          if [ -f simple-bot/requirements.txt ]; then
+            pip install -r simple-bot/requirements.txt
+          fi
+
+          if [ -f telegram-openai-bot/requirements.txt ]; then
+            pip install -r telegram-openai-bot/requirements.txt
+          fi
+
+      - name: Python syntax check
+        run: |
+          python -m compileall apps simple-bot telegram-openai-bot
+
+
+  node-check:
+    name: Node Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install packages
+        run: |
+          if [ -f apps/package.json ]; then
+            cd apps
+            npm install
+          fi
+
+      - name: Node syntax check
+        run: |
+          if [ -f apps/index.js ]; then
+            node --check apps/index.js
+          fi
+
+
+  docker-check:
+    name: Docker Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate compose
+        run: |
+          docker compose config
+
+      - name: Build containers
+        run: |
+          docker compose build
