@@ -45,3 +45,5 @@ n8n_data/
 
 # Local backups
 .backup/
+
+structure.txt
