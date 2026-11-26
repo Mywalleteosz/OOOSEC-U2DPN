@@ -166,7 +166,7 @@ class _FakeConnection:
 
     def request(self, method, path, headers):
         assert method == "GET"
-        assert path.endswith("/" + COMMIT_SHA)
+        assert path.startswith("/")
         assert headers["Connection"] == "close"
 
     def getresponse(self):

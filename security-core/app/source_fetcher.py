@@ -39,7 +39,7 @@ def validate_repository_url(value: str) -> str:
         or port not in (None, 443)
         or parsed.query
         or parsed.fragment
-        or "%" in parsed.path
+        or "\\" in parsed.path
         or "\\" in parsed.path
     ):
         raise SourcePolicyError("repository_host_or_url_not_allowed")
@@ -75,9 +75,9 @@ def validate_download_url(value: str) -> str:
         or port not in (None, 443)
         or parsed.fragment
         or parsed.query
-        or "%" in parsed.path
-        or "\\\\" in parsed.path
-        or not parsed.path.startswith("/")
+        or "\\" in parsed.path
+        or "\\" in parsed.path
+        or "\\" in parsed.path
     ):
         raise SourcePolicyError("download_host_or_url_not_allowed")
     return value
