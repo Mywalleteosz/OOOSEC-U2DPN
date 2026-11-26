@@ -11,20 +11,33 @@ async def claim_next_job(
     worker_id: str,
     *,
     lease_seconds: int = 120,
+    max_attempts: int = 3,
     now: datetime | None = None,
 ) -> dict[str, Any] | None:
-    """Atomically claim one queued job or reclaim an expired lease."""
+    """Atomically claim an eligible job or reclaim an expired lease."""
     if not worker_id or len(worker_id) > 128:
         raise ValueError("worker_id must contain 1..128 characters")
     if not 10 <= lease_seconds <= 900:
         raise ValueError("lease_seconds must be between 10 and 900")
+    if not 1 <= max_attempts <= 10:
+        raise ValueError("max_attempts must be between 1 and 10")
 
     claimed_at = now or datetime.now(timezone.utc)
     return await database.security_scan_jobs.find_one_and_update(
         {
-            "$or": [
-                {"status": "queued"},
-                {"status": "running", "lease_until": {"$lte": claimed_at}},
+            "$and": [
+                {
+                    "$or": [
+                        {"status": "queued"},
+                        {"status": "running", "lease_until": {"$lte": claimed_at}},
+                    ]
+                },
+                {
+                    "$or": [
+                        {"attempts": {"$lt": max_attempts}},
+                        {"attempts": {"$exists": False}},
+                    ]
+                },
             ]
         },
         {

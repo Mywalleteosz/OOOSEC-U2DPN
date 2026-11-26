@@ -9,9 +9,10 @@ The first increment provides:
 - a GitHub-only asset registry;
 - scan-job creation with a fixed scanner allowlist;
 - idempotency-key handling;
-- liveness and database-readiness endpoints.
+- liveness and database-readiness endpoints;
+- atomic job leasing with a bounded attempt count.
 
-Scanner execution is deliberately not implemented in this increment. Jobs are stored as `queued`; a later Scanner Engine worker will claim them using an atomic database operation.
+Scanner execution is deliberately not implemented in this increment. Jobs are stored as `queued`; a later Scanner Engine worker will claim them using an atomic database operation. Expired leases can be reclaimed, but no job can be claimed more than three times by default.
 
 ## Configuration
 
@@ -55,6 +56,8 @@ Allowed scanner identifiers: `gitleaks`, `bandit`, `pip-audit`, `trivy`. They ar
 ## Database and deployment safety
 
 The service uses a dedicated MongoDB database and collections prefixed with `security_`. It does not alter existing bot or Mini App collections and does not create MongoDB users or change the MongoDB server's authentication mode.
+
+The queue creates indexes for asset history, FIFO queued jobs, and expired-lease lookup. New jobs start with `attempts=0`; the claim operation enforces a bounded retry ceiling.
 
 The existing Compose stack must be backed up and tested before production deployment. MongoDB authentication, backups, TLS, secret-manager integration, and deployment-specific network restrictions remain required before public production use.
 

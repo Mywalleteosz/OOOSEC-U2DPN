@@ -26,7 +26,9 @@ async def test_claim_is_atomic_and_uses_a_lease(database):
     assert job["status"] == "running"
     args = database.security_scan_jobs.find_one_and_update.await_args
     assert args.kwargs["return_document"] == ReturnDocument.AFTER
-    assert args.args[0]["$or"][0] == {"status": "queued"}
+    query = args.args[0]
+    assert query["$and"][0]["$or"][0] == {"status": "queued"}
+    assert query["$and"][1]["$or"][0] == {"attempts": {"$lt": 3}}
     assert args.args[1]["$inc"] == {"attempts": 1}
     assert args.args[1]["$set"]["lease_until"] == now + timedelta(seconds=60)
 
@@ -38,10 +40,21 @@ async def test_claim_rejects_invalid_lease(database):
 
 
 @pytest.mark.asyncio
+async def test_claim_rejects_unbounded_attempts(database):
+    with pytest.raises(ValueError):
+        await claim_next_job(database, "worker-a", max_attempts=100)
+
+
+@pytest.mark.asyncio
+async def test_claim_query_excludes_exhausted_jobs(database):
+    await claim_next_job(database, "worker-a", max_attempts=2)
+    query = database.security_scan_jobs.find_one_and_update.await_args.args[0]
+    assert {"attempts": {"$lt": 2}} in query["$and"][1]["$or"]
+
+
+@pytest.mark.asyncio
 async def test_complete_requires_current_worker_lease(database):
-    result = await complete_job(
-        database, "job-1", "worker-a", findings_count=3
-    )
+    result = await complete_job(database, "job-1", "worker-a", findings_count=3)
     assert result is True
     query = database.security_scan_jobs.update_one.await_args.args[0]
     assert query["worker_id"] == "worker-a"
@@ -52,17 +65,13 @@ async def test_complete_requires_current_worker_lease(database):
 @pytest.mark.asyncio
 async def test_complete_returns_false_if_lease_was_lost(database):
     database.security_scan_jobs.update_one.return_value.modified_count = 0
-    result = await complete_job(
-        database, "job-1", "worker-a", findings_count=0
-    )
+    result = await complete_job(database, "job-1", "worker-a", findings_count=0)
     assert result is False
 
 
 @pytest.mark.asyncio
 async def test_failure_stores_only_bounded_error_code(database):
-    result = await fail_job(
-        database, "job-1", "worker-a", error_code="scanner_timeout"
-    )
+    result = await fail_job(database, "job-1", "worker-a", error_code="scanner_timeout")
     assert result is True
     update = database.security_scan_jobs.update_one.await_args.args[1]
     assert update["$set"]["error_code"] == "scanner_timeout"
@@ -72,6 +81,4 @@ async def test_failure_stores_only_bounded_error_code(database):
 @pytest.mark.asyncio
 async def test_failure_rejects_raw_exception_text(database):
     with pytest.raises(ValueError):
-        await fail_job(
-            database, "job-1", "worker-a", error_code="token=secret-value"
-        )
+        await fail_job(database, "job-1", "worker-a", error_code="token=secret-value")

@@ -52,6 +52,7 @@ async def create_scan(
         "asset_id": payload.asset_id,
         "scanner": payload.scanner.value,
         "status": "queued",
+        "attempts": 0,
         "created_at": datetime.now(timezone.utc),
     }
     if idempotency_key:
