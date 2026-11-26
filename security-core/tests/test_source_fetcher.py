@@ -6,6 +6,7 @@ import pytest
 
 from app.source_fetcher import (
     SourcePolicyError,
+    fetch_repository_archive,
     extract_source_archive,
     validate_download_url,
     validate_repository_url,
@@ -136,3 +137,115 @@ def test_archive_file_count_limit(tmp_path):
     _zip(archive, [("a.txt", b"a"), ("b.txt", b"b")])
     with pytest.raises(SourcePolicyError, match="file_count"):
         extract_source_archive(archive, tmp_path / "out", max_files=1)
+
+
+
+class _FakeResponse:
+    def __init__(self, status, body=b"", headers=None):
+        self.status = status
+        self._body = body
+        self._offset = 0
+        self._headers = headers or {}
+
+    def getheader(self, name):
+        return self._headers.get(name)
+
+    def read(self, size):
+        chunk = self._body[self._offset:self._offset + size]
+        self._offset += len(chunk)
+        return chunk
+
+    def close(self):
+        pass
+
+
+class _FakeConnection:
+    def __init__(self, host, port, address, timeout, response, calls):
+        self._response = response
+        calls.append((host, port, address, timeout))
+
+    def request(self, method, path, headers):
+        assert method == "GET"
+        assert path.endswith("/" + COMMIT_SHA)
+        assert headers["Connection"] == "close"
+
+    def getresponse(self):
+        return self._response
+
+    def close(self):
+        pass
+
+
+COMMIT_SHA = "a" * 40
+
+
+def _fake_factory_for(responses, calls):
+    def factory(host, port, address, timeout):
+        return _FakeConnection(host, port, address, timeout, responses.pop(0), calls)
+    return factory
+
+
+def _public_resolver(host, port):
+    assert host in {"codeload.github.com", "github.com"}
+    assert port == 443
+    return ("93.184.216.34",)
+
+
+def test_fetch_uses_pinned_ip_and_returns_commit_archive(tmp_path):
+    calls = []
+    body = b"archive-content"
+    result = fetch_repository_archive(
+        "https://github.com/example/repo", COMMIT_SHA, tmp_path / "repo.zip",
+        resolver=_public_resolver,
+        connection_factory=_fake_factory_for(
+            [_FakeResponse(200, body, {"Content-Length": str(len(body))})], calls),
+    )
+    assert result.read_bytes() == body
+    assert calls == [("codeload.github.com", 443, "93.184.216.34", 10.0)]
+
+
+def test_fetch_revalidates_redirect_host(tmp_path):
+    calls = []
+    with pytest.raises(SourcePolicyError, match="download_host"):
+        fetch_repository_archive(
+            "https://github.com/example/repo", COMMIT_SHA, tmp_path / "repo.zip",
+            resolver=_public_resolver,
+            connection_factory=_fake_factory_for(
+                [_FakeResponse(302, headers={"Location": "https://127.0.0.1/private.zip"})], calls),
+        )
+    assert len(calls) == 1
+    assert not (tmp_path / "repo.zip").exists()
+
+
+def test_fetch_rejects_non_immutable_ref(tmp_path):
+    with pytest.raises(SourcePolicyError, match="commit_sha"):
+        fetch_repository_archive(
+            "https://github.com/example/repo", "main", tmp_path / "repo.zip",
+            resolver=_public_resolver,
+        )
+
+
+def test_fetch_enforces_streamed_size_limit(tmp_path):
+    calls = []
+    with pytest.raises(SourcePolicyError, match="size_limit"):
+        fetch_repository_archive(
+            "https://github.com/example/repo", COMMIT_SHA, tmp_path / "repo.zip",
+            max_archive_bytes=5, resolver=_public_resolver,
+            connection_factory=_fake_factory_for([_FakeResponse(200, b"123456", {})], calls),
+        )
+    assert not (tmp_path / "repo.zip").exists()
+
+
+def test_fetch_revalidates_and_pins_each_redirect(tmp_path):
+    calls = []
+    result = fetch_repository_archive(
+        "https://github.com/example/repo", COMMIT_SHA, tmp_path / "repo.zip",
+        resolver=_public_resolver,
+        connection_factory=_fake_factory_for([
+            _FakeResponse(302, headers={"Location": "https://codeload.github.com/example/repo/archive.zip"}),
+            _FakeResponse(200, b"archive", {"Content-Length": "7"}),
+        ], calls),
+    )
+    assert result.read_bytes() == b"archive"
+    assert len(calls) == 2
+    assert all(call[2] == "93.184.216.34" for call in calls)
