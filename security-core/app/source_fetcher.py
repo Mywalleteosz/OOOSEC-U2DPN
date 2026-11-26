@@ -97,10 +97,16 @@ def validate_resolved_addresses(addresses: list[str]) -> tuple[str, ...]:
 def _safe_archive_path(name: str) -> PurePosixPath:
     if not name or "\x00" in name or "\\" in name:
         raise SourcePolicyError("archive_invalid_path")
-    path = PurePosixPath(name)
-    if path.is_absolute() or any(part in {"", ".", ".."} for part in path.parts):
+    raw_parts = name.split("/")
+    if (
+        name.startswith("/")
+        or any(part in {"", ".", ".."} for part in raw_parts)
+    ):
         raise SourcePolicyError("archive_path_traversal")
-    if path.parts and ":" in path.parts[0]:
+    path = PurePosixPath(name)
+    if path.is_absolute() or not path.parts:
+        raise SourcePolicyError("archive_path_traversal")
+    if ":" in path.parts[0]:
         raise SourcePolicyError("archive_invalid_path")
     return path
 

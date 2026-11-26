@@ -77,6 +77,13 @@ def test_zip_rejects_traversal(tmp_path, name):
     assert not (tmp_path / "escape.txt").exists()
 
 
+def test_zip_rejects_dot_segment(tmp_path):
+    archive = tmp_path / "dot.zip"
+    _zip(archive, [("repo/./file.txt", b"bad")])
+    with pytest.raises(SourcePolicyError, match="path_traversal"):
+        extract_source_archive(archive, tmp_path / "out")
+
+
 def test_zip_rejects_duplicate_paths(tmp_path):
     archive = tmp_path / "duplicate.zip"
     _zip(archive, [("repo/a.txt", b"one"), ("repo/a.txt", b"two")])
