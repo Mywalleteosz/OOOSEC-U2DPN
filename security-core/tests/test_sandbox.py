@@ -24,7 +24,7 @@ def test_image_requires_digest():
 
 def test_only_fixed_profiles_are_available():
     profile = scanner_profile("bandit", {"bandit": BANDIT_IMAGE})
-    assert profile.command == ("-r", "/src", "-f", "json", "-q")
+    assert profile.command == ("-r", "/src", "-f", "json", "-q", "--exit-zero")
     with pytest.raises(SandboxPolicyError, match="not_allowed"):
         scanner_profile("custom", {})
 

@@ -91,6 +91,7 @@ async def test_scan_requires_active_registered_asset(client, app):
         json={
             "asset_id": "00000000-0000-4000-8000-000000000001",
             "scanner": "bandit",
+            "commit_sha": "a" * 40,
         },
     )
     assert response.status_code == 404
@@ -109,6 +110,7 @@ async def test_scan_is_queued_for_registered_asset(client, app):
         json={
             "asset_id": "00000000-0000-4000-8000-000000000001",
             "scanner": "bandit",
+            "commit_sha": "a" * 40,
         },
     )
     assert response.status_code == 202
@@ -122,6 +124,7 @@ async def test_idempotency_returns_existing_job(client, app):
         "id": "00000000-0000-4000-8000-000000000002",
         "asset_id": "00000000-0000-4000-8000-000000000001",
         "scanner": "bandit",
+            "commit_sha": "a" * 40,
         "status": "queued",
         "created_at": "2026-11-26T00:00:00Z",
     }
@@ -137,6 +140,7 @@ async def test_idempotency_returns_existing_job(client, app):
         json={
             "asset_id": "00000000-0000-4000-8000-000000000001",
             "scanner": "bandit",
+            "commit_sha": "a" * 40,
         },
     )
 

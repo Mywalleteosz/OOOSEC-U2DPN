@@ -64,11 +64,18 @@ class ScanCreate(BaseModel):
 
     asset_id: str = Field(min_length=36, max_length=36)
     scanner: ScannerName
+    commit_sha: str = Field(pattern=r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
+
+    @field_validator("commit_sha")
+    @classmethod
+    def normalize_commit_sha(cls, value: str) -> str:
+        return value.lower()
 
 
 class ScanResponse(BaseModel):
     id: str
     asset_id: str
     scanner: ScannerName
+    commit_sha: str
     status: str
     created_at: datetime

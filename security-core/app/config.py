@@ -9,6 +9,8 @@ class Settings:
     mongodb_uri: str
     database_name: str
     api_token: str
+    gitleaks_image: str
+    bandit_image: str
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -16,4 +18,6 @@ class Settings:
             mongodb_uri=os.getenv("MONGODB_URI", "mongodb://mongo:27017"),
             database_name=os.getenv("SECURITY_DB_NAME", "ooosec_security"),
             api_token=os.getenv("SECURITY_CORE_API_TOKEN", ""),
+            gitleaks_image=os.getenv("SCANNER_GITLEAKS_IMAGE", ""),
+            bandit_image=os.getenv("SCANNER_BANDIT_IMAGE", ""),
         )

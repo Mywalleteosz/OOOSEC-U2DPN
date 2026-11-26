@@ -40,8 +40,14 @@ async def lifespan(app: FastAPI):
             [("status", ASCENDING), ("lease_until", ASCENDING)],
             name="scan_status_lease",
         )
+        await database.security_findings.create_index(
+            [("job_id", ASCENDING), ("fingerprint", ASCENDING)],
+            unique=True,
+            name="uniq_job_finding",
+        )
         app.state.db = database
         app.state.api_token = settings.api_token
+        app.state.settings = settings
         app.state.mongo_client = client
         yield
     finally:

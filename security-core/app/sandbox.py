@@ -41,10 +41,10 @@ def scanner_profile(name: str, images: dict[str, str]) -> ScannerProfile:
     image = validate_pinned_image(images.get(name, ""))
     commands = {
         "gitleaks": (
-            "detect", "--source", "/src", "--no-git",
+            "detect", "--source", "/src", "--no-git", "--exit-code", "0",
             "--report-format", "json", "--report-path", "/dev/stdout",
         ),
-        "bandit": ("-r", "/src", "-f", "json", "-q"),
+        "bandit": ("-r", "/src", "-f", "json", "-q", "--exit-zero"),
     }
     return ScannerProfile(name=name, image=image, command=commands[name])
 
