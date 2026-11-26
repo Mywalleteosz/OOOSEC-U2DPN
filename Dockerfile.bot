@@ -2,14 +2,19 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY telegram-openai-bot/requirements.txt .
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-RUN pip install --no-cache-dir -r requirements.txt
+COPY telegram-openai-bot/requirements.txt ./
 
-ENV PYTHONUNBUFFERED=1
+RUN pip install --no-cache-dir -r requirements.txt \
+    && groupadd --system app \
+    && useradd --system --gid app --create-home app
 
-COPY telegram-openai-bot/bot.py telegram-openai-bot/config.py ./
-COPY telegram-openai-bot/handlers ./handlers
-COPY telegram-openai-bot/services ./services
+COPY --chown=app:app telegram-openai-bot/bot.py telegram-openai-bot/config.py ./
+COPY --chown=app:app telegram-openai-bot/handlers ./handlers
+COPY --chown=app:app telegram-openai-bot/services ./services
+
+USER app
 
 CMD ["python", "bot.py"]
