@@ -75,14 +75,12 @@ def validate_download_url(value: str) -> str:
         or port not in (None, 443)
         or parsed.fragment
         or parsed.query
+        or "%" in parsed.path
         or "\\" in parsed.path
-        or "\\" in parsed.path
-        or "\\" in parsed.path
+        or not parsed.path.startswith("/")
     ):
         raise SourcePolicyError("download_host_or_url_not_allowed")
     return value
-
-
 def validate_resolved_addresses(addresses: list[str]) -> tuple[str, ...]:
     """Reject empty, mixed, private, reserved, or otherwise non-public DNS answers."""
     if not addresses:
