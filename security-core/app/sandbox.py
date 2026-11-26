@@ -168,7 +168,8 @@ def run_sandbox(
                 if cidfile.is_file():
                     container_id = cidfile.read_text(encoding="ascii").strip()
                     if re.fullmatch(r"[0-9a-f]{12,64}", container_id):
-                        subprocess.run(  # nosec B603,B607
+                        # nosec B603: fixed Docker executable/arguments; container_id is strictly validated.
+                        subprocess.run(
                             ["docker", "kill", container_id],
                             stdin=subprocess.DEVNULL,
                             stdout=subprocess.DEVNULL,
