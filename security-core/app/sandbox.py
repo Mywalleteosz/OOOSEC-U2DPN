@@ -60,10 +60,10 @@ def build_docker_argv(
     validate_pinned_image(profile.image)
     fixed_commands = {
         "gitleaks": (
-            "detect", "--source", "/src", "--no-git",
+            "detect", "--source", "/src", "--no-git", "--exit-code", "0",
             "--report-format", "json", "--report-path", "/dev/stdout",
         ),
-        "bandit": ("-r", "/src", "-f", "json", "-q"),
+        "bandit": ("-r", "/src", "-f", "json", "-q", "--exit-zero"),
     }
     if profile.command != fixed_commands[profile.name]:
         raise SandboxPolicyError("scanner_command_not_allowed")

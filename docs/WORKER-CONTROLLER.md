@@ -17,7 +17,7 @@ Every scan request now requires a 40- or 64-character Git commit SHA. The API no
 7. Normalize scanner output in memory. Persist only sanitized findings, keyed idempotently by job and fingerprint.
 8. Complete or fail only while the worker's lease is still current. Job errors contain stable codes only.
 
-The collector's `scanner_version` field records the image digest as `sha256:<digest>`, providing exact scanner image provenance rather than trusting scanner output.
+The collector's `scanner_version` field records the 64-character image digest, providing exact scanner image provenance rather than trusting scanner output.
 
 ## Runtime boundary — not enabled yet
 

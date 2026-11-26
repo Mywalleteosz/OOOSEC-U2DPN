@@ -79,7 +79,7 @@ async def process_claimed_job(
         image_digest = image.partition("@sha256:")[2]
         if len(image_digest) != 64:
             raise WorkerFailure("scanner_image_not_configured")
-        scanner_identity = f"sha256:{image_digest}"
+        scanner_identity = image_digest
 
         with tempfile.TemporaryDirectory(prefix="ooosec-worker-") as staging:
             root = Path(staging)
