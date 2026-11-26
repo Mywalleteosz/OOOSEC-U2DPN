@@ -8,16 +8,13 @@ on:
     branches:
       - main
 
-jobs:
+permissions:
+  contents: read
 
+jobs:
   python-check:
     name: Python Check
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        python-version: ["3.12"]
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,31 +22,24 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
-          if [ -f apps/requirements.txt ]; then
-            pip install -r apps/requirements.txt
-          fi
-
-          if [ -f simple-bot/requirements.txt ]; then
-            pip install -r simple-bot/requirements.txt
-          fi
-
-          if [ -f telegram-openai-bot/requirements.txt ]; then
-            pip install -r telegram-openai-bot/requirements.txt
-          fi
+          for requirements in \
+            simple-bot/requirements.txt \
+            telegram-openai-bot/requirements.txt; do
+            if [ -f "$requirements" ]; then
+              python -m pip install -r "$requirements"
+            fi
+          done
 
       - name: Python syntax check
-        run: |
-          python -m compileall apps simple-bot telegram-openai-bot
-
+        run: python -m compileall -q simple-bot telegram-openai-bot
 
   node-check:
     name: Node Check
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -59,11 +49,13 @@ jobs:
         with:
           node-version: "22"
 
-      - name: Install packages
+      - name: Check API package when source is available
         run: |
           if [ -f apps/package.json ]; then
             cd apps
-            npm install
+            npm ci
+          else
+            echo "::warning::API source is not checked out; apps is a gitlink without .gitmodules metadata."
           fi
 
       - name: Node syntax check
@@ -72,19 +64,18 @@ jobs:
             node --check apps/index.js
           fi
 
-
   docker-check:
     name: Docker Check
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate compose
-        run: |
-          docker compose config
+      - name: Prepare CI environment
+        run: cp .env.example .env
 
-      - name: Build containers
-        run: |
-          docker compose build
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
+      - name: Build Telegram bot image
+        run: docker compose build bot
