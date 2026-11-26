@@ -16,11 +16,11 @@ def app():
     application.state.db = SimpleNamespace(
         security_assets=SimpleNamespace(
             insert_one=AsyncMock(),
-            find_one=AsyncMock(),
+            find_one=AsyncMock(return_value=None),
         ),
         security_scan_jobs=SimpleNamespace(
             insert_one=AsyncMock(),
-            find_one=AsyncMock(),
+            find_one=AsyncMock(return_value=None),
         ),
     )
     return application
@@ -114,3 +114,32 @@ async def test_scan_is_queued_for_registered_asset(client, app):
     assert response.status_code == 202
     assert response.json()["status"] == "queued"
     app.state.db.security_scan_jobs.insert_one.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_idempotency_returns_existing_job(client, app):
+    existing = {
+        "id": "00000000-0000-4000-8000-000000000002",
+        "asset_id": "00000000-0000-4000-8000-000000000001",
+        "scanner": "bandit",
+        "status": "queued",
+        "created_at": "2026-11-26T00:00:00Z",
+    }
+    app.state.db.security_assets.find_one.return_value = {
+        "id": "00000000-0000-4000-8000-000000000001",
+        "status": "active",
+    }
+    app.state.db.security_scan_jobs.find_one.return_value = existing
+
+    response = await client.post(
+        "/api/v1/scans",
+        headers={"Authorization": f"Bearer {TOKEN}", "Idempotency-Key": "same-request"},
+        json={
+            "asset_id": "00000000-0000-4000-8000-000000000001",
+            "scanner": "bandit",
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json()["id"] == existing["id"]
+    app.state.db.security_scan_jobs.insert_one.assert_not_awaited()
