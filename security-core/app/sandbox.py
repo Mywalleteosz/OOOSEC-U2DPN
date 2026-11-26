@@ -4,7 +4,8 @@ import os
 import re
 import selectors
 import signal
-import subprocess  # nosec B404
+import subprocess
+import shutil  # nosec B404
 import tempfile
 import time
 from dataclasses import dataclass
@@ -168,17 +169,18 @@ def run_sandbox(
                 if cidfile.is_file():
                     container_id = cidfile.read_text(encoding="ascii").strip()
                     if re.fullmatch(r"[0-9a-f]{12,64}", container_id):
-                        # nosec B603: fixed Docker executable/arguments; container_id is strictly validated.
-                        subprocess.run(
-                            ["docker", "kill", container_id],
-                            stdin=subprocess.DEVNULL,
-                            stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL,
-                            timeout=5,
-                            check=False,
-                            close_fds=True,
-                            env={"PATH": "/usr/bin:/bin", "HOME": "/nonexistent"},
-                        )
+                        docker_binary = shutil.which("docker", path="/usr/bin:/bin")
+                        if docker_binary is not None:
+                            subprocess.run(  # nosec B603: fixed executable and arguments; container_id is strictly validated.
+                                [docker_binary, "kill", container_id],
+                                stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL,
+                                timeout=5,
+                                check=False,
+                                close_fds=True,
+                                env={"PATH": "/usr/bin:/bin", "HOME": "/nonexistent"},
+                            )
             except (OSError, subprocess.SubprocessError):
                 pass
             try:
