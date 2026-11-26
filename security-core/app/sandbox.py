@@ -4,8 +4,8 @@ import os
 import re
 import selectors
 import signal
-import subprocess
-import shutil  # nosec B404
+import subprocess  # nosec B404: subprocess is used only with fixed Docker arguments.
+import shutil
 import tempfile
 import time
 from dataclasses import dataclass
