@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import http.client
 import ipaddress
-import os
 import re
 import shutil
+import socket
+import ssl
 import tarfile
 import zipfile
 from pathlib import Path, PurePosixPath
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 
 _OWNER_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
@@ -72,6 +74,9 @@ def validate_download_url(value: str) -> str:
         or parsed.password is not None
         or port not in (None, 443)
         or parsed.fragment
+        or parsed.query
+        or "%" in parsed.path
+        or "\\\\" in parsed.path
         or not parsed.path.startswith("/")
     ):
         raise SourcePolicyError("download_host_or_url_not_allowed")
@@ -205,3 +210,122 @@ def extract_source_archive(
     except Exception:
         shutil.rmtree(root, ignore_errors=True)
         raise
+
+
+
+_COMMIT_RE = re.compile(r"^(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})$")
+_REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+
+
+class _PinnedHTTPSConnection(http.client.HTTPSConnection):
+    """HTTPS connection that dials one prevalidated IP but verifies the DNS hostname."""
+
+    def __init__(self, host: str, port: int, address: str, timeout: float) -> None:
+        super().__init__(host=host, port=port, timeout=timeout, context=ssl.create_default_context())
+        self._pinned_address = address
+
+    def connect(self) -> None:
+        raw_socket = socket.create_connection((self._pinned_address, self.port), timeout=self.timeout)
+        try:
+            self.sock = self._context.wrap_socket(raw_socket, server_hostname=self.host)
+        except Exception:
+            raw_socket.close()
+            raise
+
+
+def _resolve_public_addresses(host: str, port: int) -> tuple[str, ...]:
+    try:
+        records = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError as exc:
+        raise SourcePolicyError("dns_resolution_failed") from exc
+    return validate_resolved_addresses([record[4][0] for record in records])
+
+
+def _request_pinned(url: str, *, timeout: float, resolver=_resolve_public_addresses, connection_factory=_PinnedHTTPSConnection):
+    """Perform exactly one GET; redirects are returned to the caller, never followed."""
+    safe_url = validate_download_url(url)
+    parsed = urlsplit(safe_url)
+    port = parsed.port or 443
+    addresses = resolver(parsed.hostname, port)
+    last_error = None
+    for address in addresses:
+        connection = connection_factory(parsed.hostname, port, address, timeout)
+        try:
+            connection.request("GET", parsed.path or "/", headers={
+                "Accept": "application/zip, application/octet-stream",
+                "User-Agent": "OOOSEC-SourceFetcher/1.0",
+                "Connection": "close",
+            })
+            return connection, connection.getresponse()
+        except (OSError, http.client.HTTPException, ssl.SSLError) as exc:
+            last_error = exc
+            connection.close()
+    raise SourcePolicyError("source_connection_failed") from last_error
+
+
+def fetch_repository_archive(repository_url: str, commit_sha: str, destination: str | Path, *,
+                              timeout: float = 10.0, max_archive_bytes: int = 25 * 1024 * 1024,
+                              max_redirects: int = 3, resolver=_resolve_public_addresses,
+                              connection_factory=_PinnedHTTPSConnection) -> Path:
+    """Download a GitHub commit archive over DNS-pinned, TLS-verified HTTPS."""
+    canonical = validate_repository_url(repository_url)
+    if not isinstance(commit_sha, str) or not _COMMIT_RE.fullmatch(commit_sha):
+        raise SourcePolicyError("immutable_commit_sha_required")
+    if not 1 <= timeout <= 60 or not 0 <= max_redirects <= 5:
+        raise SourcePolicyError("invalid_fetch_limits")
+    if not 1 <= max_archive_bytes <= 100 * 1024 * 1024:
+        raise SourcePolicyError("invalid_archive_size_limit")
+    if not isinstance(destination, (str, Path)):
+        raise SourcePolicyError("invalid_destination")
+
+    owner, repository = urlsplit(canonical).path.strip("/").split("/")
+    current_url = f"https://codeload.github.com/{owner}/{repository}/legacy.zip/{commit_sha.lower()}"
+    target = Path(destination)
+    if target.exists():
+        raise SourcePolicyError("destination_must_not_exist")
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    for redirect_count in range(max_redirects + 1):
+        connection = response = None
+        try:
+            connection, response = _request_pinned(current_url, timeout=timeout, resolver=resolver,
+                                                   connection_factory=connection_factory)
+            if response.status in _REDIRECT_STATUSES:
+                location = response.getheader("Location")
+                if not location or redirect_count >= max_redirects:
+                    raise SourcePolicyError("source_redirect_limit_or_missing_location")
+                current_url = urljoin(current_url, location)
+                validate_download_url(current_url)
+                continue
+            if response.status != 200:
+                raise SourcePolicyError("source_http_status_rejected")
+            content_length = response.getheader("Content-Length")
+            if content_length is not None:
+                try:
+                    declared_size = int(content_length)
+                except (TypeError, ValueError) as exc:
+                    raise SourcePolicyError("source_invalid_content_length") from exc
+                if declared_size < 0 or declared_size > max_archive_bytes:
+                    raise SourcePolicyError("source_archive_size_limit")
+            written = 0
+            with target.open("xb") as output:
+                while True:
+                    chunk = response.read(min(64 * 1024, max_archive_bytes - written + 1))
+                    if not chunk:
+                        break
+                    written += len(chunk)
+                    if written > max_archive_bytes:
+                        raise SourcePolicyError("source_archive_size_limit")
+                    output.write(chunk)
+            if not written:
+                raise SourcePolicyError("source_empty_archive")
+            return target
+        except Exception:
+            target.unlink(missing_ok=True)
+            raise
+        finally:
+            if response is not None:
+                response.close()
+            if connection is not None:
+                connection.close()
+    raise SourcePolicyError("source_redirect_limit")
