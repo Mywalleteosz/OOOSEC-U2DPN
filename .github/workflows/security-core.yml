@@ -38,7 +38,9 @@ jobs:
 
       - name: Unit tests
         working-directory: security-core
-        run: pytest -q
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q
 
       - name: Dependency audit
         run: pip-audit -r security-core/requirements.txt
