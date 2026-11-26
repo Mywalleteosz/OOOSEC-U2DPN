@@ -51,6 +51,7 @@ async def create_scan(
         "id": str(uuid4()),
         "asset_id": payload.asset_id,
         "scanner": payload.scanner.value,
+        "commit_sha": payload.commit_sha,
         "status": "queued",
         "attempts": 0,
         "created_at": datetime.now(timezone.utc),
