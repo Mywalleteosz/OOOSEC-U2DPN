@@ -85,3 +85,17 @@ def test_docker_command_never_accepts_user_argv(tmp_path):
     assert "sh" not in argv
     assert ";" not in argv
     assert "&&" not in argv
+
+
+def test_builder_rejects_manually_constructed_arbitrary_profile(tmp_path):
+    from app.sandbox import ScannerProfile
+
+    source = tmp_path / "source"
+    source.mkdir()
+    malicious = ScannerProfile(
+        name="bandit",
+        image=BANDIT_IMAGE,
+        command=("sh", "-c", "touch /tmp/pwned"),
+    )
+    with pytest.raises(SandboxPolicyError, match="command_not_allowed"):
+        build_docker_argv(malicious, source, tmp_path / "cid")

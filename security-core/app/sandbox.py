@@ -54,6 +54,19 @@ def build_docker_argv(
     cidfile: str | Path,
 ) -> list[str]:
     """Build a locked-down Docker invocation. Never invokes a shell."""
+    if profile.name not in _PROFILES:
+        raise SandboxPolicyError("scanner_profile_not_allowed")
+    validate_pinned_image(profile.image)
+    fixed_commands = {
+        "gitleaks": (
+            "detect", "--source", "/src", "--no-git",
+            "--report-format", "json", "--report-path", "/dev/stdout",
+        ),
+        "bandit": ("-r", "/src", "-f", "json", "-q"),
+    }
+    if profile.command != fixed_commands[profile.name]:
+        raise SandboxPolicyError("scanner_command_not_allowed")
+
     source = Path(source_directory)
     if not source.is_absolute() or not source.is_dir() or source.is_symlink():
         raise SandboxPolicyError("source_directory_must_be_absolute_real_directory")

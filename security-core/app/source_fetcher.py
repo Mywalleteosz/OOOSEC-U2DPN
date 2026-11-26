@@ -244,7 +244,7 @@ def _request_pinned(url: str, *, timeout: float, resolver=_resolve_public_addres
     safe_url = validate_download_url(url)
     parsed = urlsplit(safe_url)
     port = parsed.port or 443
-    addresses = resolver(parsed.hostname, port)
+    addresses = validate_resolved_addresses(list(resolver(parsed.hostname, port)))
     last_error = None
     for address in addresses:
         connection = connection_factory(parsed.hostname, port, address, timeout)
