@@ -1,0 +1,23 @@
+services:
+  security-core:
+    build:
+      context: ./security-core
+      dockerfile: Dockerfile
+    environment:
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+      SECURITY_DB_NAME: ${SECURITY_DB_NAME:-ooosec_security}
+      SECURITY_CORE_API_TOKEN: ${SECURITY_CORE_API_TOKEN:?Set SECURITY_CORE_API_TOKEN in .env}
+    depends_on:
+      mongo:
+        condition: service_started
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 96
+    mem_limit: 256m
+    cpus: 0.50
