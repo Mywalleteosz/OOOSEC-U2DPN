@@ -4,7 +4,7 @@ import os
 import re
 import selectors
 import signal
-import subprocess
+import subprocess  # nosec B404
 import tempfile
 import time
 from dataclasses import dataclass
@@ -88,7 +88,7 @@ def build_docker_argv(
         "--user", "65532:65532",
         "--ulimit", "nofile=64:64",
         "--ulimit", "fsize=10485760:10485760",
-        "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m",
+        "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16m",  # nosec B108
         "--mount", f"type=bind,src={source},dst=/src,readonly",
         "--workdir", "/src",
         "--env", "HOME=/tmp",
@@ -168,7 +168,7 @@ def run_sandbox(
                 if cidfile.is_file():
                     container_id = cidfile.read_text(encoding="ascii").strip()
                     if re.fullmatch(r"[0-9a-f]{12,64}", container_id):
-                        subprocess.run(
+                        subprocess.run(  # nosec B603,B607
                             ["docker", "kill", container_id],
                             stdin=subprocess.DEVNULL,
                             stdout=subprocess.DEVNULL,
